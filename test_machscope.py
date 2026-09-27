@@ -1,12 +1,16 @@
 """Test output and errors without depending on a changing live process list."""
 
 import io
+from pathlib import Path
 import subprocess
+import sys
+import tempfile
 import unittest
 from contextlib import redirect_stderr, redirect_stdout
 from unittest.mock import patch
 
 import machscope
+import demo
 from test_observe import capture_call
 
 
@@ -53,6 +57,14 @@ class SnapshotTests(unittest.TestCase):
 
 
 class CommandLineTests(unittest.TestCase):
+    def test_demo_uses_the_project_environment_for_child_commands(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            python = root / ".venv" / "bin" / "python"
+            python.parent.mkdir(parents=True)
+            python.symlink_to(sys.executable)
+            self.assertEqual(demo.select_python(root, "system-python"), str(python))
+            self.assertEqual(demo.select_python(root / "without-venv", "system-python"), "system-python")
     def test_name_is_forwarded(self):
         with patch("observe.observe", return_value=0) as monitor:
             self.assertEqual(machscope.main(["observe", "Spotify Helper"]), 0)
@@ -72,6 +84,8 @@ class CommandLineTests(unittest.TestCase):
             ["observe", "--pid", "abc"],
             ["observe", "--pid", "999999999999999999"],
             ["unknown"],
+            ["record", "sleep", "--interval", "0.01"],
+            ["record", "sleep", "--interval", "nan"],
         ]
         for arguments in cases:
             with self.subTest(arguments=arguments), redirect_stderr(io.StringIO()):

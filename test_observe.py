@@ -17,6 +17,8 @@ def fake_process(pid, name="Spotify"):
     process.status.return_value = psutil.STATUS_SLEEPING
     process.memory_info.return_value.rss = 381_000_000
     process.num_threads.return_value = 24
+    process.open_files.return_value = []
+    process.children.return_value = []
     return process
 
 

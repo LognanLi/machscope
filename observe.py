@@ -42,6 +42,17 @@ def ensure_running(process):
         raise psutil.NoSuchProcess(process.pid)
 
 
+def read_sample(process, interval=1.0):
+    """Measure one interval; discard it if the original process disappears."""
+    ensure_running(process)
+    # CPU use needs two readings, one second apart. RSS is stored in bytes.
+    cpu = process.cpu_percent(interval=interval)
+    memory = process.memory_info().rss
+    threads = process.num_threads()
+    ensure_running(process)
+    return {"cpu_percent": cpu, "memory_bytes": memory, "thread_count": threads}
+
+
 def observe_process(process):
     """Watch the selected process until it exits or the user presses Ctrl-C."""
     try:
@@ -49,16 +60,11 @@ def observe_process(process):
         print(f"Process: {process.name()}\nPID: {process.pid}", flush=True)
         print("Updating about every second. Press Ctrl-C to stop.\n", flush=True)
         while True:
-            ensure_running(process)
-            # CPU percentage compares CPU time before and after a one-second wait.
-            # 100% means roughly one fully occupied logical CPU; it can exceed 100%.
-            cpu = process.cpu_percent(interval=1.0)
-            memory_mb = process.memory_info().rss / 1_000_000
-            threads = process.num_threads()
-            # Discard a sample if the process disappeared while we were measuring.
-            ensure_running(process)
+            sample = read_sample(process)
             print(
-                f"CPU: {cpu:.1f}%   Memory (RSS): {memory_mb:.1f} MB   Threads: {threads}",
+                f"CPU: {sample['cpu_percent']:.1f}%   "
+                f"Memory (RSS): {sample['memory_bytes'] / 1_000_000:.1f} MB   "
+                f"Threads: {sample['thread_count']}",
                 flush=True,
             )
     except psutil.NoSuchProcess:
